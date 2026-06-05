@@ -9,6 +9,10 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # Suppress Node.js 20 deprecation warnings
 
+# Deny all permissions by default; each job grants only what it needs.
+permissions:
+  contents: read
+
 jobs:
 
   # ── Stage 1: Secret Scanning ───────────────────────────────────────────────

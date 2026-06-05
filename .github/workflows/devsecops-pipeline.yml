@@ -6,53 +6,51 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+  issues: write
+  security-events: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
 
-  # ── Stage 1: Secret Scanning ───────────────────────────────────────────────
   secret-scan:
     name: Secret Detection
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
       - name: Run secret scanner
         run: python scripts/secret_scanner.py
 
-  # ── Stage 2: Unit Tests ────────────────────────────────────────────────────
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
     needs: secret-scan
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
       - name: Install dependencies
         run: pip install -r app/requirements.txt
-
       - name: Run tests
         run: pytest tests/ -v
 
-  # ── Stage 3: Container Build & Trivy Scan ─────────────────────────────────
   container-security:
-    name: Container Build & Trivy Scan
+    name: Container Build and Trivy Scan
     runs-on: ubuntu-latest
     needs: unit-tests
     steps:
       - uses: actions/checkout@v4
-
       - name: Build Docker image
         run: docker build -t devsecops-demo:${{ github.sha }} .
-
       - name: Run Trivy vulnerability scan
         uses: aquasecurity/trivy-action@master
         with:
@@ -62,28 +60,24 @@ jobs:
           severity: 'CRITICAL'
           ignore-unfixed: true
 
-  # ── Stage 4: DAST with OWASP ZAP ──────────────────────────────────────────
   dast-scan:
     name: OWASP ZAP DAST Scan
     runs-on: ubuntu-latest
     needs: unit-tests
     steps:
       - uses: actions/checkout@v4
-
       - name: Start application
         run: |
           pip install -r app/requirements.txt
           nohup python app/app.py &
           sleep 5
           curl -f http://localhost:5000/health
-
       - name: OWASP ZAP Baseline Scan
         uses: zaproxy/action-baseline@v0.12.0
         with:
           target: 'http://localhost:5000'
           fail_action: false
           artifact_name: zap-report
-
       - name: Upload ZAP report
         uses: actions/upload-artifact@v4
         if: always()
@@ -91,7 +85,6 @@ jobs:
           name: zap-security-report
           path: report_html.html
 
-  # ── Stage 5: Deploy (only on main, all gates passed) ──────────────────────
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
@@ -99,9 +92,8 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
-
       - name: Simulate deployment
         run: |
-          echo "✅ All security gates passed"
-          echo "✅ Deploying devsecops-demo:${{ github.sha }}"
-          echo "✅ Deployment complete"
+          echo "All security gates passed"
+          echo "Deploying devsecops-demo"
+          echo "Deployment complete"
